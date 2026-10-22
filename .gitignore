@@ -1,0 +1,22 @@
+# Secretos: la cadena real de la base de datos va solo en .env (nunca a GitHub)
+.env
+*.env
+!.env.example
+
+# Entornos virtuales
+venv/
+.venv/
+myvenv/
+
+# Cachés de Python
+__pycache__/
+*.pyc
+
+# Sketches de Arduino (tienen las credenciales del WiFi)
+*.ino
+
+# Editores y sistema
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
