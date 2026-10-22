@@ -275,6 +275,11 @@ tbody tr:last-child td { border-bottom: 0; }
 .toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: calc(100% - 32px); padding: 12px 16px; border-radius: var(--radius-sm); background: var(--text); color: var(--bg); font-size: .9rem; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
 
 /* ---------------- Breakpoints ---------------- */
+@media (max-width: 599px) {
+  th, td { padding: 8px 4px; }
+  td { font-size: .8125rem; }
+  th { font-size: .75rem; }
+}
 @media (max-width: 399px) {
   .topbar { gap: 6px; padding: 0 10px; }
   .brand-text { display: none; }

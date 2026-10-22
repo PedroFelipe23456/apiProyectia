@@ -8,6 +8,15 @@ const $ = (id) => document.getElementById(id);
 const graficos = {};
 const INTERVALO = { vivo: 1000, historial: 5000 };
 
+// Rangos de corriente para el gráfico "Clasificación por corriente", pensados para
+// el motor TT 1:48 (sin carga ~150 mA, frenado > 1 A). Ajústalos si cambias de carga.
+const RANGOS_CORRIENTE = [
+  { nombre: "Detenido", hasta: 0.1, texto: "< 0,1 A" },
+  { nombre: "Normal", hasta: 0.5, texto: "0,1–0,5 A" },
+  { nombre: "Alto", hasta: 1.0, texto: "0,5–1 A" },
+  { nombre: "Sobrecarga", hasta: Infinity, texto: "≥ 1 A" },
+];
+
 let modo = "vivo";
 let pausado = false;
 let timer = null;
@@ -220,8 +229,21 @@ function colores() {
   return {
     c1: token("--chart-1"), c2: token("--chart-2"), c3: token("--chart-3"),
     track: token("--chart-track"), grid: token("--chart-grid"),
-    texto: token("--text-muted"), danger: token("--danger"),
+    texto: token("--text-muted"), danger: token("--danger"), warn: token("--warn"),
   };
+}
+
+function coloresCorriente(c) {
+  return [c.c3, c.c1, c.warn, c.danger];
+}
+
+/** Cuenta cuántas lecturas caen en cada rango de RANGOS_CORRIENTE. */
+function clasificarCorriente(corrientes) {
+  const cuentas = RANGOS_CORRIENTE.map(() => 0);
+  for (const x of corrientes) {
+    cuentas[RANGOS_CORRIENTE.findIndex((r) => x < r.hasta)]++;
+  }
+  return cuentas;
 }
 
 function ejes(c, extra = {}) {
@@ -271,8 +293,17 @@ function crearGraficos() {
 
   graficos.corriente = new Chart($("g-corriente"), {
     type: "doughnut",
-    data: { labels: ["Baja (< 2 A)", "Media (2–4,5 A)", "Alta (> 4,5 A)"], datasets: [{ data: [0, 0, 0], backgroundColor: [c.c3, c.c1, c.danger], borderWidth: 0 }] },
-    options: { maintainAspectRatio: false, cutout: "60%", plugins: { legend: { position: "bottom", labels: { color: c.texto, boxWidth: 12 } } } },
+    data: {
+      labels: RANGOS_CORRIENTE.map((r) => `${r.nombre} (${r.texto})`),
+      datasets: [{ data: RANGOS_CORRIENTE.map(() => 0), backgroundColor: coloresCorriente(c), borderWidth: 0 }],
+    },
+    options: {
+      maintainAspectRatio: false, cutout: "60%",
+      plugins: {
+        legend: { position: "bottom", labels: { color: c.texto, boxWidth: 12 } },
+        tooltip: { callbacks: { label: (ctx) => ` ${ctx.parsed} lecturas` } },
+      },
+    },
   });
 }
 
@@ -297,11 +328,10 @@ function actualizarGraficos() {
   graficos.voltaje.data.datasets[0].data = [Math.min(...vs), Number(prom.toFixed(2)), Math.max(...vs)];
   graficos.voltaje.update(como);
 
-  graficos.corriente.data.datasets[0].data = [
-    is.filter((x) => x < 2).length,
-    is.filter((x) => x >= 2 && x <= 4.5).length,
-    is.filter((x) => x > 4.5).length,
-  ];
+  // La cantidad va en la leyenda para que se lea sin pasar el mouse por encima
+  const cuentas = clasificarCorriente(is);
+  graficos.corriente.data.labels = RANGOS_CORRIENTE.map((r, k) => `${r.nombre} (${r.texto}): ${cuentas[k]}`);
+  graficos.corriente.data.datasets[0].data = cuentas;
   graficos.corriente.update(como);
 
   const actual = ps[ps.length - 1];
@@ -321,7 +351,7 @@ export function aplicarTema() {
   graficos.potencia.data.datasets[0].borderColor = c.c1;
   graficos.potencia.data.datasets[0].backgroundColor = c.c1 + "33";
   graficos.voltaje.data.datasets[0].backgroundColor = [c.c3, c.c1, c.c2];
-  graficos.corriente.data.datasets[0].backgroundColor = [c.c3, c.c1, c.danger];
+  graficos.corriente.data.datasets[0].backgroundColor = coloresCorriente(c);
   for (const g of Object.values(graficos)) {
     const s = g.options.scales || {};
     for (const eje of Object.values(s)) {

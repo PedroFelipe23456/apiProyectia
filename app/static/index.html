@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap">
   <!-- ?v=… obliga al navegador a bajar la versión nueva tras cada despliegue -->
-  <link rel="stylesheet" href="/static/css/styles.css?v=3.2.0">
+  <link rel="stylesheet" href="/static/css/styles.css?v=3.3.0">
   <script>
     // Aplica el tema guardado antes de pintar (evita un destello de color)
     try {
@@ -19,7 +19,7 @@
     } catch (e) {}
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-  <script type="module" src="/static/js/app.js?v=3.2.0"></script>
+  <script type="module" src="/static/js/app.js?v=3.3.0"></script>
 </head>
 <body>
   <!-- Iconos (Lucide, trazo 2 px) -->
@@ -179,7 +179,7 @@
               <div class="chart-box"><canvas id="g-voltaje" role="img" aria-label="Voltaje mínimo, promedio y máximo"></canvas></div>
             </article>
             <article class="card">
-              <div class="card-head"><h2>Clasificación por corriente</h2><span class="help">Registros</span></div>
+              <div class="card-head"><h2>Clasificación por corriente</h2><span class="help">Lecturas por rango · motor TT</span></div>
               <div class="chart-box"><canvas id="g-corriente" role="img" aria-label="Registros por rango de corriente"></canvas></div>
             </article>
             <article class="card chart-wide">
