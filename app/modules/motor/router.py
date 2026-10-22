@@ -20,7 +20,8 @@ from app.modules.energia import vivo
 router = APIRouter(prefix="/motor", tags=["Motor"])
 
 # Si el ESP32 no consulta en este tiempo, la web lo muestra como desconectado.
-SEGUNDOS_CONECTADO = 5
+# Con el menú y el guardado cada 5 s, el ESP32 consulta cada 1-4 s (HTTPS es lento).
+SEGUNDOS_CONECTADO = 10
 
 
 class EstadoMotor(BaseModel):

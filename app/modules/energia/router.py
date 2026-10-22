@@ -14,7 +14,7 @@ Menú del teclado HX-543 (opciones que consultan la base de datos). Cada una res
 - GET  /mediciones/maxmin-24h      opción 4: potencia máxima y mínima de las últimas 24 h
 - GET  /mediciones/promedio-hora   opción 5: potencia promedio de la última hora
 - GET  /mediciones/registros-24h   opción 6: cantidad de registros de las últimas 24 h
-- GET  /mediciones/desviacion      opción 9: desviación estándar de la potencia
+- GET  /mediciones/desviacion      opción 9: desviación estándar de la potencia, últimas 24 h
 - GET  /mediciones/menu            todo lo anterior en un solo JSON (lo usa la web)
 """
 import statistics
@@ -133,8 +133,11 @@ def _ventana(db: Session, horas: int) -> EstadisticaVentana:
     return EstadisticaVentana(registros=total or 0, promedio_w=r(prom), max_w=r(maximo), min_w=r(minimo))
 
 
-def _desviacion(db: Session, limit: int = 500) -> Optional[float]:
-    potencias = [float(m.potencia_w) for m in _ultimas(db, limit)]
+def _desviacion(db: Session, horas: int = 24) -> Optional[float]:
+    """Desviación estándar de la potencia en la misma ventana que las opciones 3, 4 y 6."""
+    M = models.Medicion
+    desde = _ahora_bd(db) - timedelta(hours=horas)
+    potencias = [float(p) for (p,) in db.query(M.potencia_w).filter(M.fecha_hora >= desde).all()]
     return round(statistics.pstdev(potencias), 2) if len(potencias) >= 2 else None
 
 
@@ -180,9 +183,9 @@ def menu_registros_24h(db: Session = Depends(get_db)):
 
 
 @router.get("/desviacion")
-def desviacion(limit: int = 500, db: Session = Depends(get_db)):
-    """Opción 9 del teclado: desviación estándar de la potencia (últimos `limit` registros)."""
-    d = _desviacion(db, limit)
+def desviacion(db: Session = Depends(get_db)):
+    """Opción 9 del teclado: desviación estándar de la potencia de las últimas 24 h."""
+    d = _desviacion(db)
     return _lcd("Pocos registros" if d is None else f"SD: {d:.2f} W")
 
 
