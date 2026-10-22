@@ -1,104 +1,109 @@
-# API Taller 1 — Medición de potencia con ACS712
+# API Taller 1 — PowerMonitor IoT
 
-API REST en Python (FastAPI + SQLAlchemy) con estructura POO que expone
-CRUD completo sobre las 14 tablas creadas en `taller1_basedatos.sql`.
+API REST (FastAPI + SQLAlchemy) y aplicación web para:
 
-## Estructura del proyecto
+- **Energía**: medir voltaje, corriente y potencia con un ESP32 + ACS712 y guardarlo en PostgreSQL.
+- **Motor**: controlar la velocidad y dirección de un motor DC (ESP32 + L298N) desde la web.
+- **Catálogos**: CRUD de roles, usuarios, ubicaciones, sensores, componentes, umbrales, alertas y reportes.
+- **Visión**: detección con YOLOv8 (focos encendidos/apagados y personas).
+- **WhatsApp**: chatbot de consultas (Twilio + Ollama).
+
+## Estructura
 
 ```
 app/
-  database.py              # Conexión a PostgreSQL (SQLAlchemy)
-  models.py                # Entidades ORM (una clase por tabla)
-  schemas.py                # Validación Pydantic (Create/Read por entidad)
-  repository.py             # BaseRepository genérico + repos por entidad (herencia)
-  crud_router.py            # CRUDRouter genérico -> arma las 5 rutas REST
-  reporte_detalle_router.py # Router especial (llave primaria compuesta)
-  main.py                   # Punto de entrada, registra todos los routers
-requirements.txt
-.env.example
+  main.py                  # crea la app y registra cada módulo
+  core/
+    database.py            # conexión a PostgreSQL (lee DATABASE_URL de .env)
+    crud_router.py         # CRUDRouter genérico: arma las 5 rutas REST de una tabla
+  db/
+    models.py              # entidades ORM (una clase por tabla)
+    schemas.py             # validación Pydantic (Create / Read)
+    repository.py          # BaseRepository genérico + un repositorio por entidad
+  modules/
+    energia/router.py      # /mediciones
+    motor/router.py        # /motor
+    catalogos/router.py    # /roles, /usuarios, ... (usa CRUDRouter)
+    catalogos/reporte_detalle.py  # /reporte-detalle (llave primaria compuesta)
+    vision/router.py       # /vision/detectar  (+ best.pt)
+    whatsapp/router.py     # /webhook/whatsapp
+  static/                  # aplicación web
+    index.html             # shell: acceso, navegación y las 3 vistas
+    css/styles.css         # sistema de diseño (modo oscuro y claro, responsive)
+    js/api.js              # fetch, formato de números, aviso "despertando servidor"
+    js/app.js              # sesión, navegación por módulos, tema, estado del ESP32
+    js/energia.js          # módulo Energía: KPIs, 5 gráficos y tabla
+    js/motor.js            # módulo Motor: slider, dirección y DETENER
+    js/prediccion.js       # módulo Predicción
+exportar.py                # exporta las mediciones a datos_sensores.csv
 ```
 
-## 1. Instalación
+## 1. Instalación (Windows, PowerShell)
 
-```bash
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-## 2. Configurar la base de datos
+> `ultralytics` (YOLO) es pesado. Si solo vas a usar energía y motor puedes
+> omitirlo: el módulo de visión carga el modelo la primera vez que se usa y
+> el resto de la API funciona sin él.
+
+## 2. Base de datos
 
 1. Copia `.env.example` a `.env`.
-2. Reemplaza `DATABASE_URL` con la cadena de conexión de tu PostgreSQL
-   en la nube (la misma donde corriste `taller1_basedatos.sql`).
+2. Pon en `DATABASE_URL` la cadena de tu PostgreSQL (la misma donde corriste `taller1_basedatos.sql`).
 
-```
-DATABASE_URL=postgresql://usuario:password@host:5432/taller1_db
-```
-
-> La API **no crea las tablas** (`Base.metadata.create_all` no se llama):
-> se asume que ya ejecutaste el script SQL de la Parte 1. Esto evita
-> tener el esquema definido en dos lugares distintos.
+`.env` **no se sube a GitHub** (está en `.gitignore`). La API no crea las tablas.
 
 ## 3. Ejecutar
 
-```bash
+```powershell
 uvicorn app.main:app --reload
 ```
 
-Documentación interactiva (Swagger) en `http://127.0.0.1:8000/docs`.
+- Aplicación web: http://127.0.0.1:8000
+- Documentación (Swagger): http://127.0.0.1:8000/docs
 
-## 4. Endpoints disponibles
+## 4. Endpoints
 
-Cada uno de estos prefijos expone `GET /`, `GET /{id}`, `POST /`,
-`PUT /{id}` y `DELETE /{id}`:
+### Energía
+| Método | Ruta | Quién | Qué hace |
+|---|---|---|---|
+| POST | `/mediciones/` | ESP32 | Guarda una medición |
+| GET | `/mediciones/?limit=20` | Web, LCD | Historial, más reciente primero |
+| GET | `/mediciones/resumen` | Web | Promedios, máximo, mínimo y energía total |
+| GET | `/mediciones/desviacion` | LCD (opción 9) | `{"resultado": "SD: 0.23 W"}` |
 
-| Prefijo | Entidad |
-|---|---|
-| `/roles` | Roles |
-| `/usuarios` | Usuarios |
-| `/ubicaciones` | Ubicaciones |
-| `/tipos-sensor` | Tipos de sensor (catálogo ACS712, etc.) |
-| `/unidades-medida` | Unidades de medida |
-| `/tipos-umbral` | Tipos de umbral de alerta |
-| `/dispositivos` | Dispositivos ESP32 |
-| `/sensores` | Sensores físicos instalados |
-| `/componentes` | Componentes eléctricos monitoreados |
-| `/mediciones` | Mediciones de corriente/voltaje/potencia |
-| `/umbrales` | Umbrales configurados por componente |
-| `/alertas` | Alertas generadas |
-| `/reportes` | Reportes PDF generados |
-| `/reporte-detalle/{id_reporte}/{id_medicion}` | Relación reporte↔mediciones (PK compuesta) |
+### Motor
+| Método | Ruta | Quién | Qué hace |
+|---|---|---|---|
+| GET | `/motor/?v=5.8&i=230&p=1.33` | ESP32 (cada 1 s) | Devuelve `{"velocidad", "direccion"}` y guarda la lectura en vivo |
+| PUT | `/motor/` | Web | Cambia velocidad (0-100) y dirección (`adelante`, `atras`, `stop`) |
+| GET | `/motor/estado` | Web | Estado + ESP32 conectado + lectura en vivo |
 
-## 5. Conexión con el ESP32 (Parte 2)
+El estado del motor está en memoria: si el servidor reinicia vuelve a `stop`.
 
-El sketch del ESP32 envía cada medición así:
+### Catálogos
+Cada prefijo expone `GET /`, `GET /{id}`, `POST /`, `PUT /{id}` y `DELETE /{id}`:
+`/roles`, `/usuarios`, `/ubicaciones`, `/tipos-sensor`, `/unidades-medida`, `/tipos-umbral`,
+`/dispositivos`, `/sensores`, `/componentes`, `/umbrales`, `/alertas`, `/reportes`
+y `/reporte-detalle/{id_reporte}/{id_medicion}`.
 
-```
-POST /mediciones
-Content-Type: application/json
+## 5. Conexión con el ESP32
 
-{
-  "id_componente": 1,
-  "corriente_a": 1.24,
-  "voltaje_v": 120.0,
-  "potencia_w": 148.8,
-  "energia_kwh": 0.000206
-}
+En el sketch:
+
+```cpp
+const char* API_URL       = "https://TU-SERVICIO.onrender.com/mediciones/";
+const char* API_MOTOR_URL = "https://TU-SERVICIO.onrender.com/motor/";
 ```
 
-Solo reemplaza `API_URL` en `sketch.ino` por la URL pública donde
-despliegues esta API (por ejemplo con Render, Railway o un túnel
-como ngrok si la corres localmente).
+Las dos terminan en `/`: el ESP32 no sigue redirecciones.
 
-## 6. Ejemplo rápido con curl
+## 6. Despliegue en Render
 
-```bash
-# Crear una medición
-curl -X POST http://127.0.0.1:8000/mediciones \
-  -H "Content-Type: application/json" \
-  -d '{"id_componente":1,"corriente_a":1.2,"voltaje_v":120,"potencia_w":144,"energia_kwh":0.012}'
-
-# Listar mediciones
-curl http://127.0.0.1:8000/mediciones
-```
+- Build: `pip install -r requirements.txt`
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Variable de entorno: `DATABASE_URL` (en Render → Environment, no en el código).
