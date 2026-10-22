@@ -5,8 +5,8 @@ y se implementa aparte.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app import models, schemas
+from app.core.database import get_db
+from app.db import models, schemas
 
 router = APIRouter(prefix="/reporte-detalle", tags=["Reporte - Detalle"])
 

@@ -4,8 +4,8 @@ sale (Read) en cada ruta. Cada entidad sigue el mismo patrón Base -> Create -> 
 """
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
+from typing import Optional, Union
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 
 # ---------------- Roles ----------------
@@ -158,11 +158,11 @@ class ComponenteElectricoRead(ComponenteElectricoBase):
 
 # ---------------- Mediciones ----------------
 class MedicionBase(BaseModel):
-    id_componente: int
-    corriente_a: Decimal
-    voltaje_v: Decimal
-    potencia_w: Decimal
-    energia_kwh: Decimal
+    id_componente: int = 1
+    corriente_a: Union[float, Decimal, str]
+    voltaje_v: Union[float, Decimal, str]
+    potencia_w: Union[float, Decimal, str]
+    energia_kwh: Union[float, Decimal, str]
 
 
 class MedicionCreate(MedicionBase):
@@ -172,7 +172,27 @@ class MedicionCreate(MedicionBase):
 class MedicionRead(MedicionBase):
     model_config = ConfigDict(from_attributes=True)
     id_medicion: int
-    fecha_hora: datetime
+    fecha_hora: Union[datetime, str]
+
+    @field_validator('corriente_a', 'voltaje_v', 'potencia_w', 'energia_kwh', mode='before')
+    @classmethod
+    def normalizar_flotante(cls, v):
+        if v is None:
+            return 0.0
+        try:
+            # Extrae el número flotante limpio sin notaciones de ceros infladas
+            s = str(v).strip()
+            if s.replace('.', '', 1).replace('-', '', 1).isdigit():
+                val = float(s)
+                # Si el valor viene absurdamente inflado por InfluxDB, tomar significativos
+                if abs(val) > 10000 and '.' in s:
+                    p = s.split('.')
+                    val = float(p[0][-3:] + '.' + p[1][:2])
+                # 4 decimales: la energía (kWh) por registro es muy pequeña
+                return round(val, 4)
+            return float(v)
+        except Exception:
+            return 0.0
 
 
 # ---------------- Umbrales de alerta ----------------

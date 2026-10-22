@@ -6,7 +6,7 @@ from sqlalchemy import (
     ForeignKey, func
 )
 from sqlalchemy.orm import relationship
-from app.database import Base
+from app.core.database import Base
 
 
 class Rol(Base):
@@ -129,6 +129,7 @@ class UmbralAlerta(Base):
     valor_limite = Column(Numeric(10, 2), nullable=False)
 
     componente = relationship("ComponenteElectrico", back_populates="umbrales")
+    tipo_umbral = relationship("TipoUmbral")  # lo usa el chatbot de WhatsApp
     alertas = relationship("Alerta", back_populates="umbral")
 
 

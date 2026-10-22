@@ -2,14 +2,14 @@
 CRUDRouter: clase que, dado un modelo ORM, sus esquemas Pydantic y su
 repositorio, genera automáticamente las 5 rutas REST estándar
 (listar, obtener, crear, actualizar, eliminar). Cada entidad del
-taller instancia esta clase una vez en app/main.py en lugar de
+taller instancia esta clase una vez en app/modules/catalogos/router.py en lugar de
 reescribir las mismas 5 rutas 14 veces (composición + genéricos).
 """
 from typing import Type, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.core.database import get_db
 
 
 class CRUDRouter:

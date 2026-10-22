@@ -4,13 +4,13 @@ Capa de repositorios (patrón Repository).
 BaseRepository centraliza las operaciones CRUD comunes a cualquier
 entidad usando Genéricos de Python. Cada entidad tiene su propio
 repositorio que HEREDA de BaseRepository y solo agrega los métodos
-propios de su dominio (ej. buscar usuario por email). Esto evita
-repetir código CRUD 14 veces y es la base de la estructura POO pedida
-en el taller.
+propios de su dominio.
 """
+import requests
+from datetime import datetime
 from typing import TypeVar, Generic, Type, List, Optional
 from sqlalchemy.orm import Session
-from app import models
+from app.db import models
 
 ModelType = TypeVar("ModelType")
 
@@ -111,6 +111,18 @@ class ComponenteElectricoRepository(BaseRepository[models.ComponenteElectrico]):
 class MedicionRepository(BaseRepository[models.Medicion]):
     def __init__(self, db: Session):
         super().__init__(models.Medicion, db)
+
+    def get_all(self, skip: int = 0, limit: int = 100) -> List[models.Medicion]:
+        """
+        Obtiene las mediciones almacenadas directamente en PostgreSQL (Neon).
+        """
+        return (
+            self.db.query(models.Medicion)
+            .order_by(models.Medicion.fecha_hora.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     def get_by_componente(self, id_componente: int, limit: int = 100) -> List[models.Medicion]:
         return (

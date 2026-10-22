@@ -1,73 +1,71 @@
 """
-API Taller 1 - Medición de potencia eléctrica con sensor ACS712
-FastAPI + SQLAlchemy, estructurada en POO:
-  models.py      -> Entidades ORM (una clase por tabla)
-  schemas.py     -> Validación de entrada/salida (Pydantic)
-  repository.py  -> BaseRepository genérico + un repositorio por entidad (herencia)
-  crud_router.py -> CRUDRouter genérico que arma las rutas REST de cada entidad
+API Taller 1 - Monitoreo de potencia (ESP32 + ACS712), control de motor DC y visión YOLOv8.
 
-Ejecutar con:  uvicorn app.main:app --reload
-Documentación interactiva en:  http://127.0.0.1:8000/docs
+Punto de entrada: crea la app y registra cada módulo.
+
+    app/
+      core/      conexión a la base de datos y CRUD genérico
+      db/        modelos ORM, esquemas Pydantic y repositorios
+      modules/
+        energia/    mediciones de voltaje, corriente y potencia
+        motor/      control del motor DC desde la web
+        catalogos/  CRUD de roles, usuarios, sensores, umbrales, reportes...
+        vision/     detección con YOLOv8
+        whatsapp/   chatbot de consultas (Twilio + Ollama)
+      static/    aplicación web (dashboard de energía + control de motor)
 """
-from fastapi import FastAPI
+import os
 
-from app import models, schemas
-from app.crud_router import CRUDRouter
-from app.reporte_detalle_router import router as reporte_detalle_router
-from app.repository import (
-    RolRepository,
-    UsuarioRepository,
-    UbicacionRepository,
-    TipoSensorRepository,
-    UnidadMedidaRepository,
-    TipoUmbralRepository,
-    DispositivoRepository,
-    SensorRepository,
-    ComponenteElectricoRepository,
-    MedicionRepository,
-    UmbralAlertaRepository,
-    AlertaRepository,
-    ReporteRepository,
-)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.modules.catalogos.router import crear_routers as routers_catalogos
+from app.modules.energia.router import router as energia_router
+from app.modules.motor.router import router as motor_router
+from app.modules.vision.router import router as vision_router
+from app.modules.whatsapp.router import router as whatsapp_router
 
 app = FastAPI(
-    title="API Taller 1 - Medición de Potencia (ACS712)",
-    description="API REST en POO (FastAPI + SQLAlchemy) para el sistema de "
-                 "monitoreo de potencia eléctrica del Taller 1 - IA 2026-2.",
-    version="1.0.0",
+    title="API Taller 1 - PowerMonitor IoT",
+    description="Monitoreo de potencia eléctrica, control de motor DC y visión artificial.",
+    version="3.0.0",
 )
 
-# (prefijo, etiquetas, esquema de creación, esquema de lectura, repositorio, nombre de PK)
-RUTAS = [
-    ("/roles", ["Roles"], schemas.RolCreate, schemas.RolRead, RolRepository, "id_rol"),
-    ("/usuarios", ["Usuarios"], schemas.UsuarioCreate, schemas.UsuarioRead, UsuarioRepository, "id_usuario"),
-    ("/ubicaciones", ["Ubicaciones"], schemas.UbicacionCreate, schemas.UbicacionRead, UbicacionRepository, "id_ubicacion"),
-    ("/tipos-sensor", ["Tipos de sensor"], schemas.TipoSensorCreate, schemas.TipoSensorRead, TipoSensorRepository, "id_tipo_sensor"),
-    ("/unidades-medida", ["Unidades de medida"], schemas.UnidadMedidaCreate, schemas.UnidadMedidaRead, UnidadMedidaRepository, "id_unidad"),
-    ("/tipos-umbral", ["Tipos de umbral"], schemas.TipoUmbralCreate, schemas.TipoUmbralRead, TipoUmbralRepository, "id_tipo_umbral"),
-    ("/dispositivos", ["Dispositivos"], schemas.DispositivoCreate, schemas.DispositivoRead, DispositivoRepository, "id_dispositivo"),
-    ("/sensores", ["Sensores"], schemas.SensorCreate, schemas.SensorRead, SensorRepository, "id_sensor"),
-    ("/componentes", ["Componentes eléctricos"], schemas.ComponenteElectricoCreate, schemas.ComponenteElectricoRead, ComponenteElectricoRepository, "id_componente"),
-    ("/mediciones", ["Mediciones"], schemas.MedicionCreate, schemas.MedicionRead, MedicionRepository, "id_medicion"),
-    ("/umbrales", ["Umbrales de alerta"], schemas.UmbralAlertaCreate, schemas.UmbralAlertaRead, UmbralAlertaRepository, "id_umbral"),
-    ("/alertas", ["Alertas"], schemas.AlertaCreate, schemas.AlertaRead, AlertaRepository, "id_alerta"),
-    ("/reportes", ["Reportes"], schemas.ReporteCreate, schemas.ReporteRead, ReporteRepository, "id_reporte"),
-]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+)
 
-for prefix, tags, create_schema, read_schema, repo_cls, pk_name in RUTAS:
-    crud = CRUDRouter(
-        prefix=prefix,
-        tags=tags,
-        create_schema=create_schema,
-        read_schema=read_schema,
-        repository_cls=repo_cls,
-        pk_name=pk_name,
-    )
-    app.include_router(crud.router)
-
-app.include_router(reporte_detalle_router)
+app.include_router(energia_router)
+app.include_router(motor_router)
+for r in routers_catalogos():
+    app.include_router(r)
+app.include_router(vision_router)
+app.include_router(whatsapp_router)
 
 
-@app.get("/", tags=["Estado"])
-def estado():
-    return {"mensaje": "API Taller 1 - Medición de potencia con ACS712", "estado": "activo"}
+# ---------------- Aplicación web ----------------
+STATIC_PATH = os.path.join(os.path.dirname(__file__), "static")
+INDEX_HTML = os.path.join(STATIC_PATH, "index.html")
+
+app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def aplicacion_web():
+    return FileResponse(INDEX_HTML)
+
+
+@app.get("/app", include_in_schema=False)
+def aplicacion_web_alias():
+    """Ruta anterior de la app móvil; se mantiene para no romper enlaces."""
+    return FileResponse(INDEX_HTML)
+
+
+@app.get("/salud", tags=["Estado"])
+def salud():
+    return {"mensaje": "API Taller - PowerMonitor IoT", "estado": "activo"}
