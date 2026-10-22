@@ -15,6 +15,8 @@ from typing import Literal, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.modules.energia import vivo
+
 router = APIRouter(prefix="/motor", tags=["Motor"])
 
 # Si el ESP32 no consulta en este tiempo, la web lo muestra como desconectado.
@@ -61,6 +63,7 @@ def leer_motor(
         _ultimo_contacto = time.monotonic()
         if v is not None and i is not None and p is not None:
             _lectura = LecturaEnVivo(voltaje_v=v, corriente_ma=i, potencia_w=p)
+            vivo.registrar(v, i, p)  # para las gráficas en tiempo real
         return _estado
 
 

@@ -5,18 +5,20 @@ Módulo Energía: mediciones de voltaje, corriente y potencia del ESP32 + ACS712
 - GET  /mediciones/            el dashboard y el LCD leen el historial (más reciente primero).
 - GET  /mediciones/resumen     estadísticas para las tarjetas del dashboard.
 - GET  /mediciones/desviacion  opción 9 del menú del LCD: {"resultado": "..."}.
+- GET  /mediciones/vivo        últimas lecturas en tiempo real (memoria, ~1 por segundo).
 """
 import statistics
 import traceback
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.db import schemas
 from app.db.repository import MedicionRepository
+from app.modules.energia import vivo
 
 router = APIRouter(prefix="/mediciones", tags=["Mediciones"])
 
@@ -55,6 +57,12 @@ def crear_medicion(item: schemas.MedicionCreate, db: Session = Depends(get_db)):
     except Exception:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="No se pudo guardar la medición")
+
+
+@router.get("/vivo", response_model=List[vivo.PuntoVivo])
+def lecturas_en_vivo(n: int = Query(120, ge=1, le=vivo.MAX_PUNTOS)):
+    """Las últimas `n` lecturas que mandó el ESP32, de la más antigua a la más reciente."""
+    return vivo.ultimos(n)
 
 
 @router.get("/resumen", response_model=ResumenMediciones)

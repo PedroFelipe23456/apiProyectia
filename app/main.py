@@ -52,7 +52,17 @@ app.include_router(whatsapp_router)
 STATIC_PATH = os.path.join(os.path.dirname(__file__), "static")
 INDEX_HTML = os.path.join(STATIC_PATH, "index.html")
 
-app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+class StaticSinCache(StaticFiles):
+    """Obliga al navegador a revalidar (ETag) los archivos de la web en cada carga,
+    para que tras un despliegue no se queden módulos JS viejos en caché."""
+
+    async def get_response(self, path, scope):
+        respuesta = await super().get_response(path, scope)
+        respuesta.headers["Cache-Control"] = "no-cache"
+        return respuesta
+
+
+app.mount("/static", StaticSinCache(directory=STATIC_PATH), name="static")
 
 
 @app.get("/", include_in_schema=False)

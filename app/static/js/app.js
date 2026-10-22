@@ -9,7 +9,6 @@ const $ = (id) => document.getElementById(id);
 const RUTAS = ["energia", "motor", "prediccion"];
 let rutaActual = null;
 let timerEstado = null;
-let timerEnergia = null;
 
 // ---------------- Sesión (demo, sin validación real) ----------------
 function haySesion() {
@@ -29,7 +28,8 @@ function entrar() {
 function salir() {
   try { sessionStorage.removeItem("pm-sesion"); } catch (e) { /* nada */ }
   clearInterval(timerEstado);
-  clearInterval(timerEnergia);
+  energia.detener();
+  rutaActual = null;
   $("vista-app").hidden = true;
   $("vista-login").hidden = false;
   $("login-usuario").focus();
@@ -60,11 +60,8 @@ function navegar() {
   window.scrollTo(0, 0);
 
   // Las mediciones solo se consultan mientras el módulo Energía está abierto
-  clearInterval(timerEnergia);
-  if (ruta === "energia") {
-    energia.cargar();
-    timerEnergia = setInterval(energia.cargar, 5000);
-  }
+  if (ruta === "energia") energia.iniciar();
+  else energia.detener();
 }
 window.addEventListener("hashchange", navegar);
 
@@ -78,7 +75,7 @@ async function consultarEstado() {
     pill.classList.toggle("off", !r.conectado);
     $("pill-esp32-texto").textContent = r.conectado ? "ESP32 conectado" : "ESP32 desconectado";
     motor.actualizarEstado(r);
-    energia.actualizarVivo(r);
+    energia.actualizarConexion(r);
   } catch (e) {
     pill.classList.remove("on");
     pill.classList.add("off");
@@ -102,6 +99,7 @@ $("btn-tema").addEventListener("click", () => {
 
 // ---------------- Arranque ----------------
 motor.initMotor();
+energia.initEnergia();
 initPrediccion();
 pintarBotonTema();
 if (haySesion()) entrar();
