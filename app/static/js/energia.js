@@ -15,6 +15,7 @@ let cargando = false;
 let ticks = 0;
 let puntos = [];        // [{etiqueta, voltaje_v, corriente_a, potencia_w}] del más antiguo al más reciente
 let resumenBD = null;   // /mediciones/resumen (energía acumulada y totales de la base de datos)
+let menuBD = null;      // /mediciones/menu (opciones 2-6 y 9 del teclado)
 let conectado = false;
 
 // ---------------- Ciclo de actualización ----------------
@@ -36,13 +37,16 @@ async function cargar() {
   try {
     // El resumen de la base de datos cambia poco: en vivo se pide cada 10 s
     const pedirResumen = modo === "historial" || ticks % 10 === 0 || !resumenBD;
-    const [datos, res] = await Promise.all([
+    const [datos, res, menu] = await Promise.all([
       modo === "vivo" ? pedir("/mediciones/vivo?n=120") : pedir("/mediciones/?limit=30"),
       pedirResumen ? pedir("/mediciones/resumen?limit=500") : Promise.resolve(resumenBD),
+      pedirResumen ? pedir("/mediciones/menu") : Promise.resolve(menuBD),
     ]);
     // Si el usuario cambió de modo mientras llegaba la respuesta, se descarta
     if (modoPedido !== modo) return;
     resumenBD = res;
+    menuBD = menu;
+    pintarMenu();
     puntos = modo === "vivo"
       ? datos.map((p) => ({ ...p, etiqueta: horaLocal(p.ts) }))
       : datos.slice().reverse().map((m) => ({
@@ -177,6 +181,21 @@ function pintarFuente() {
   $("fuente-texto").textContent = texto;
   $("fuente-lectura").classList.toggle("live", vivo);
   $("nota-potencia").textContent = modo === "vivo" ? "W · cada segundo" : "W · registros guardados";
+}
+
+/** Tarjeta "Menú del teclado": los mismos cálculos que muestra el LCD. */
+function pintarMenu() {
+  if (!menuBD) return;
+  const u = menuBD.ultimo;
+  const d = menuBD.ultimas_24h;
+  const h = menuBD.ultima_hora;
+  $("menu-ultimo").textContent = u ? `${fmt(u.voltaje_v, 1)} V · ${fmt(u.potencia_w, 2)} W` : "Sin registros";
+  $("menu-ultimo-hora").textContent = u ? hora(u.fecha_hora).slice(0, 5) : "";
+  $("menu-prom24").textContent = d.registros ? `${fmt(d.promedio_w, 2)} W` : "Sin registros";
+  $("menu-maxmin").textContent = d.registros ? `${fmt(d.max_w, 2)} / ${fmt(d.min_w, 2)} W` : "Sin registros";
+  $("menu-promh").textContent = h.registros ? `${fmt(h.promedio_w, 2)} W` : "Sin registros";
+  $("menu-regs").textContent = String(d.registros);
+  $("menu-sd").textContent = menuBD.desviacion_w === null ? "Pocos registros" : `${fmt(menuBD.desviacion_w, 2)} W`;
 }
 
 function pintarTabla() {

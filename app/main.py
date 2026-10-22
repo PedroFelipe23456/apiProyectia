@@ -65,15 +65,18 @@ class StaticSinCache(StaticFiles):
 app.mount("/static", StaticSinCache(directory=STATIC_PATH), name="static")
 
 
+SIN_CACHE = {"Cache-Control": "no-cache"}
+
+
 @app.get("/", include_in_schema=False)
 def aplicacion_web():
-    return FileResponse(INDEX_HTML)
+    return FileResponse(INDEX_HTML, headers=SIN_CACHE)
 
 
 @app.get("/app", include_in_schema=False)
 def aplicacion_web_alias():
     """Ruta anterior de la app móvil; se mantiene para no romper enlaces."""
-    return FileResponse(INDEX_HTML)
+    return FileResponse(INDEX_HTML, headers=SIN_CACHE)
 
 
 @app.get("/salud", tags=["Estado"])

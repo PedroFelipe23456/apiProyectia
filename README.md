@@ -74,7 +74,22 @@ uvicorn app.main:app --reload
 | POST | `/mediciones/` | ESP32 | Guarda una medición |
 | GET | `/mediciones/?limit=20` | Web, LCD | Historial, más reciente primero |
 | GET | `/mediciones/resumen` | Web | Promedios, máximo, mínimo y energía total |
-| GET | `/mediciones/desviacion` | LCD (opción 9) | `{"resultado": "SD: 0.23 W"}` |
+| GET | `/mediciones/vivo?n=120` | Web | Lecturas en tiempo real (memoria, ~1 por segundo) |
+| GET | `/mediciones/menu` | Web | Todas las opciones del menú del teclado en un JSON |
+
+### Menú del teclado HX-543
+Cada opción responde `{"resultado": "..."}` con un texto de máximo 16 caracteres para el LCD.
+
+| Tecla | Ruta | Ejemplo |
+|---|---|---|
+| 2 | `/mediciones/ultimo` | `V:5.7V P:1.20W` |
+| 3 | `/mediciones/promedio-24h` | `Prom: 1.34 W` |
+| 4 | `/mediciones/maxmin-24h` | `Mx:1.7 Mn:1.0W` |
+| 5 | `/mediciones/promedio-hora` | `Prom H: 1.34 W` |
+| 6 | `/mediciones/registros-24h` | `Total: 30 regs` |
+| 9 | `/mediciones/desviacion` | `SD: 0.19 W` |
+
+Las opciones 1, 7, 8, 0 y A se resuelven en el ESP32 sin consultar la API.
 
 ### Motor
 | Método | Ruta | Quién | Qué hace |

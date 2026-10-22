@@ -207,6 +207,15 @@ main { padding: 16px 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)
 }
 @keyframes latido { 50% { opacity: .35; } }
 
+/* Menú del teclado */
+.menu-teclado { margin-bottom: 16px; }
+.menu-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 24px; }
+.menu-lista li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--border); font-size: .9375rem; }
+.menu-lista .num { text-align: right; white-space: nowrap; }
+.tecla { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; font-family: var(--font-mono); font-size: .875rem; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); color: var(--primary); }
+@media (min-width: 768px) { .menu-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .menu-lista { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
 /* Gráficos */
 .charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .chart-box { position: relative; height: 220px; }

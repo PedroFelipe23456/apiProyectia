@@ -6,17 +6,29 @@ Módulo Energía: mediciones de voltaje, corriente y potencia del ESP32 + ACS712
 - GET  /mediciones/resumen     estadísticas para las tarjetas del dashboard.
 - GET  /mediciones/desviacion  opción 9 del menú del LCD: {"resultado": "..."}.
 - GET  /mediciones/vivo        últimas lecturas en tiempo real (memoria, ~1 por segundo).
+
+Menú del teclado HX-543 (opciones que consultan la base de datos). Cada una responde
+{"resultado": "..."} con un texto de máximo 16 caracteres, listo para el LCD:
+- GET  /mediciones/ultimo          opción 2: último registro guardado
+- GET  /mediciones/promedio-24h    opción 3: potencia promedio de las últimas 24 h
+- GET  /mediciones/maxmin-24h      opción 4: potencia máxima y mínima de las últimas 24 h
+- GET  /mediciones/promedio-hora   opción 5: potencia promedio de la última hora
+- GET  /mediciones/registros-24h   opción 6: cantidad de registros de las últimas 24 h
+- GET  /mediciones/desviacion      opción 9: desviación estándar de la potencia
+- GET  /mediciones/menu            todo lo anterior en un solo JSON (lo usa la web)
 """
 import statistics
 import traceback
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.db import schemas
+from app.db import models, schemas
 from app.db.repository import MedicionRepository
 from app.modules.energia import vivo
 
@@ -86,10 +98,101 @@ def resumen(limit: int = 500, db: Session = Depends(get_db)):
     )
 
 
+# ---------------- Menú del teclado ----------------
+class EstadisticaVentana(BaseModel):
+    registros: int
+    promedio_w: Optional[float]
+    max_w: Optional[float]
+    min_w: Optional[float]
+
+
+class MenuTeclado(BaseModel):
+    ultimo: Optional[schemas.MedicionRead]
+    ultimas_24h: EstadisticaVentana
+    ultima_hora: EstadisticaVentana
+    desviacion_w: Optional[float]
+
+
+def _ahora_bd(db: Session) -> datetime:
+    """Hora actual según la base de datos, para comparar con fecha_hora (que pone la BD)."""
+    ahora = db.query(func.now()).scalar()
+    if isinstance(ahora, str):  # SQLite devuelve texto
+        ahora = datetime.fromisoformat(ahora)
+    return ahora.replace(tzinfo=None)
+
+
+def _ventana(db: Session, horas: int) -> EstadisticaVentana:
+    M = models.Medicion
+    desde = _ahora_bd(db) - timedelta(hours=horas)
+    total, prom, maximo, minimo = (
+        db.query(func.count(M.id_medicion), func.avg(M.potencia_w), func.max(M.potencia_w), func.min(M.potencia_w))
+        .filter(M.fecha_hora >= desde)
+        .one()
+    )
+    r = lambda x: None if x is None else round(float(x), 2)
+    return EstadisticaVentana(registros=total or 0, promedio_w=r(prom), max_w=r(maximo), min_w=r(minimo))
+
+
+def _desviacion(db: Session, limit: int = 500) -> Optional[float]:
+    potencias = [float(m.potencia_w) for m in _ultimas(db, limit)]
+    return round(statistics.pstdev(potencias), 2) if len(potencias) >= 2 else None
+
+
+def _lcd(texto: str) -> dict:
+    return {"resultado": texto[:16]}
+
+
+@router.get("/ultimo")
+def menu_ultimo(db: Session = Depends(get_db)):
+    """Opción 2 del teclado."""
+    datos = _ultimas(db, 1)
+    if not datos:
+        return _lcd("Sin registros")
+    m = datos[0]
+    return _lcd(f"V:{float(m.voltaje_v):.1f}V P:{float(m.potencia_w):.2f}W")
+
+
+@router.get("/promedio-24h")
+def menu_promedio_24h(db: Session = Depends(get_db)):
+    """Opción 3 del teclado."""
+    v = _ventana(db, 24)
+    return _lcd("Sin registros" if not v.registros else f"Prom: {v.promedio_w:.2f} W")
+
+
+@router.get("/maxmin-24h")
+def menu_maxmin_24h(db: Session = Depends(get_db)):
+    """Opción 4 del teclado."""
+    v = _ventana(db, 24)
+    return _lcd("Sin registros" if not v.registros else f"Mx:{v.max_w:.1f} Mn:{v.min_w:.1f}W")
+
+
+@router.get("/promedio-hora")
+def menu_promedio_hora(db: Session = Depends(get_db)):
+    """Opción 5 del teclado."""
+    v = _ventana(db, 1)
+    return _lcd("Sin registros 1h" if not v.registros else f"Prom H: {v.promedio_w:.2f} W")
+
+
+@router.get("/registros-24h")
+def menu_registros_24h(db: Session = Depends(get_db)):
+    """Opción 6 del teclado."""
+    return _lcd(f"Total: {_ventana(db, 24).registros} regs")
+
+
 @router.get("/desviacion")
 def desviacion(limit: int = 500, db: Session = Depends(get_db)):
-    """Desviación estándar de la potencia. El LCD muestra los primeros 16 caracteres."""
-    potencias = [float(m.potencia_w) for m in _ultimas(db, limit)]
-    if len(potencias) < 2:
-        return {"resultado": "Pocos registros"}
-    return {"resultado": f"SD: {statistics.pstdev(potencias):.2f} W"}
+    """Opción 9 del teclado: desviación estándar de la potencia (últimos `limit` registros)."""
+    d = _desviacion(db, limit)
+    return _lcd("Pocos registros" if d is None else f"SD: {d:.2f} W")
+
+
+@router.get("/menu", response_model=MenuTeclado)
+def menu_completo(db: Session = Depends(get_db)):
+    """Los mismos datos de las opciones 2-6 y 9, para mostrarlos en la web."""
+    datos = _ultimas(db, 1)
+    return MenuTeclado(
+        ultimo=datos[0] if datos else None,
+        ultimas_24h=_ventana(db, 24),
+        ultima_hora=_ventana(db, 1),
+        desviacion_w=_desviacion(db),
+    )
