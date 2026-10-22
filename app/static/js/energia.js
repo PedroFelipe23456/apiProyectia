@@ -8,6 +8,12 @@ const $ = (id) => document.getElementById(id);
 const graficos = {};
 const INTERVALO = { vivo: 1000, historial: 5000 };
 
+// Niveles de potencia: los mismos que usan los LEDs del medidor (actualizarLeds en el sketch)
+const NIVEL_MEDIO_W = 5;
+const NIVEL_ALTO_W = 15;
+// Escalas "redondas" para el arco: se elige la menor que cubra el máximo de la ventana
+const ESCALAS_W = [1, 2, 5, 10, 15, 20, 50, 100, 200, 500, 1000, 2000];
+
 // Rangos de corriente para el gráfico "Clasificación por corriente", pensados para
 // el motor TT 1:48 (sin carga ~150 mA, frenado > 1 A). Ajústalos si cambias de carga.
 const RANGOS_CORRIENTE = [
@@ -229,8 +235,20 @@ function colores() {
   return {
     c1: token("--chart-1"), c2: token("--chart-2"), c3: token("--chart-3"),
     track: token("--chart-track"), grid: token("--chart-grid"),
-    texto: token("--text-muted"), danger: token("--danger"), warn: token("--warn"),
+    texto: token("--text-muted"), danger: token("--danger"), warn: token("--warn"), ok: token("--ok"),
   };
+}
+
+/** Degradado arcoíris de izquierda (0 W, verde) a derecha (máximo, rojo) para el arco. */
+function degradadoArco(chart) {
+  const area = chart.chartArea;
+  const c = colores();
+  if (!area) return c.ok;
+  const g = chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
+  g.addColorStop(0, c.ok);
+  g.addColorStop(0.5, c.warn);
+  g.addColorStop(1, c.danger);
+  return g;
 }
 
 function coloresCorriente(c) {
@@ -245,6 +263,9 @@ function clasificarCorriente(corrientes) {
   }
   return cuentas;
 }
+
+// Marca solo el último punto de cada línea: así se ve llegar cada lectura nueva
+const ultimoPunto = (ctx) => (ctx.dataIndex === ctx.dataset.data.length - 1 ? 4 : 0);
 
 function ejes(c, extra = {}) {
   return {
@@ -262,33 +283,54 @@ function crearGraficos() {
 
   graficos.gauge = new Chart($("g-gauge"), {
     type: "doughnut",
-    data: { labels: ["Potencia (W)", "Restante"], datasets: [{ data: [0, 1], backgroundColor: [c.c1, c.track], borderWidth: 0 }] },
-    options: { maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: "78%", plugins: { legend: { display: false }, tooltip: { enabled: false } } },
+    data: {
+      labels: ["Potencia (W)", "Restante"],
+      datasets: [{
+        data: [0, 1],
+        // El tramo lleno se pinta con el degradado arcoíris; el resto es la pista gris
+        backgroundColor: (ctx) => (ctx.dataIndex === 0 ? degradadoArco(ctx.chart) : colores().track),
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: "74%",
+      // El arco siempre se anima (300 ms) para que se vea subir y bajar en vivo
+      animation: reducido ? false : { duration: 300, easing: "easeOutCubic" },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
   });
 
   graficos.vi = new Chart($("g-vi"), {
     type: "line",
     data: { labels: [], datasets: [
-      { label: "Voltaje (V)", data: [], borderColor: c.c1, backgroundColor: c.c1, yAxisID: "y", borderWidth: 2, pointRadius: 0, tension: .3 },
-      { label: "Corriente (A)", data: [], borderColor: c.c2, backgroundColor: c.c2, yAxisID: "y1", borderWidth: 2, pointRadius: 0, tension: .3, borderDash: [6, 4] },
+      { label: "Voltaje (V)", data: [], borderColor: c.c1, backgroundColor: c.c1, yAxisID: "y", borderWidth: 2, pointRadius: ultimoPunto, tension: .3 },
+      { label: "Corriente (A)", data: [], borderColor: c.c2, backgroundColor: c.c2, yAxisID: "y1", borderWidth: 2, pointRadius: ultimoPunto, tension: .3, borderDash: [6, 4] },
     ] },
     options: {
       maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: c.texto, boxWidth: 12 } } },
-      scales: { ...ejes(c), y1: { position: "right", grid: { drawOnChartArea: false }, ticks: { color: c.texto } } },
+      // grace: margen arriba y abajo para que la línea no quede pegada al borde
+      scales: {
+        ...ejes(c, { grace: "15%", title: { display: true, text: "V", color: c.texto } }),
+        y1: { position: "right", grace: "15%", grid: { drawOnChartArea: false }, ticks: { color: c.texto }, title: { display: true, text: "A", color: c.texto } },
+      },
     },
   });
 
   graficos.potencia = new Chart($("g-potencia"), {
     type: "line",
-    data: { labels: [], datasets: [{ label: "Potencia (W)", data: [], borderColor: c.c1, backgroundColor: c.c1 + "33", fill: true, borderWidth: 2, pointRadius: 0, tension: .3 }] },
+    data: { labels: [], datasets: [{ label: "Potencia (W)", data: [], borderColor: c.c1, backgroundColor: c.c1 + "33", fill: true, borderWidth: 2, pointRadius: ultimoPunto, tension: .3 }] },
     options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, plugins: { legend: { display: false } }, scales: ejes(c, { beginAtZero: true }) },
   });
 
   graficos.voltaje = new Chart($("g-voltaje"), {
     type: "bar",
     data: { labels: ["Mínimo", "Promedio", "Máximo"], datasets: [{ label: "Voltaje (V)", data: [0, 0, 0], backgroundColor: [c.c3, c.c1, c.c2], borderRadius: 4 }] },
-    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: ejes(c) },
+    // El eje no empieza en 0: así se notan diferencias pequeñas entre mín, prom y máx
+    options: {
+      indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { ...ejes(c), x: { ...ejes(c).x, beginAtZero: false, grace: "60%" } },
+    },
   });
 
   graficos.corriente = new Chart($("g-corriente"), {
@@ -325,8 +367,11 @@ function actualizarGraficos() {
   graficos.potencia.update(como);
 
   const prom = vs.reduce((a, b) => a + b, 0) / vs.length;
-  graficos.voltaje.data.datasets[0].data = [Math.min(...vs), Number(prom.toFixed(2)), Math.max(...vs)];
+  const vMin = Math.min(...vs);
+  const vMax = Math.max(...vs);
+  graficos.voltaje.data.datasets[0].data = [vMin, Number(prom.toFixed(2)), vMax];
   graficos.voltaje.update(como);
+  $("nota-voltaje").textContent = `${fmt(vMin, 2)} · ${fmt(prom, 2)} · ${fmt(vMax, 2)} V`;
 
   // La cantidad va en la leyenda para que se lea sin pasar el mouse por encima
   const cuentas = clasificarCorriente(is);
@@ -334,18 +379,32 @@ function actualizarGraficos() {
   graficos.corriente.data.datasets[0].data = cuentas;
   graficos.corriente.update(como);
 
-  const actual = ps[ps.length - 1];
-  const maximo = Math.max(1, Math.max(...ps) * 1.2);
-  graficos.gauge.data.datasets[0].data = [Math.max(0, actual), Math.max(0, maximo - actual)];
-  graficos.gauge.update(como);
+  actualizarGauge(ps[ps.length - 1], Math.max(...ps));
+}
+
+/** Arco arcoíris: escala redonda estable y nivel según los umbrales de los LEDs. */
+function actualizarGauge(actual, maxVentana) {
+  const escala = ESCALAS_W.find((e) => e >= maxVentana * 1.1) || ESCALAS_W[ESCALAS_W.length - 1];
+  const valor = Math.min(Math.max(0, actual), escala);
+  graficos.gauge.data.datasets[0].data = [valor, escala - valor];
+  graficos.gauge.update();
   $("gauge-valor").textContent = fmt(actual, 2);
+  $("gauge-max").textContent = `${fmt(escala, 0)} W`;
+
+  const nivel = $("gauge-nivel");
+  const [clase, texto] = actual >= NIVEL_ALTO_W
+    ? ["alto", `Nivel alto (≥ ${NIVEL_ALTO_W} W)`]
+    : actual >= NIVEL_MEDIO_W
+      ? ["medio", `Nivel medio (${NIVEL_MEDIO_W}–${NIVEL_ALTO_W} W)`]
+      : ["bajo", `Nivel bajo (< ${NIVEL_MEDIO_W} W)`];
+  nivel.className = "gauge-nivel " + clase;
+  nivel.textContent = texto;
 }
 
 /** Recolorea los gráficos al cambiar entre modo claro y oscuro. */
 export function aplicarTema() {
   if (!graficos.gauge) return;
   const c = colores();
-  graficos.gauge.data.datasets[0].backgroundColor = [c.c1, c.track];
   graficos.vi.data.datasets[0].borderColor = graficos.vi.data.datasets[0].backgroundColor = c.c1;
   graficos.vi.data.datasets[1].borderColor = graficos.vi.data.datasets[1].backgroundColor = c.c2;
   graficos.potencia.data.datasets[0].borderColor = c.c1;
@@ -357,6 +416,7 @@ export function aplicarTema() {
     for (const eje of Object.values(s)) {
       if (eje.ticks) eje.ticks.color = c.texto;
       if (eje.grid && eje.grid.color) eje.grid.color = c.grid;
+      if (eje.title) eje.title.color = c.texto;
     }
     if (g.options.plugins.legend && g.options.plugins.legend.labels) g.options.plugins.legend.labels.color = c.texto;
     g.update();

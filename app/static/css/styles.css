@@ -222,6 +222,11 @@ main { padding: 16px 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)
 .chart-box.gauge { height: 170px; }
 .gauge-center { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; pointer-events: none; }
 .gauge-center .kpi-value { font-size: 1.75rem; }
+.gauge-scale { display: flex; justify-content: space-between; padding: 0 6%; margin-top: 4px; font-size: .75rem; color: var(--text-muted); }
+.gauge-nivel { margin-top: 8px; text-align: center; font-size: .875rem; font-weight: 500; color: var(--text-muted); }
+.gauge-nivel.bajo { color: var(--ok); }
+.gauge-nivel.medio { color: var(--warn); }
+.gauge-nivel.alto { color: var(--danger); }
 
 .state { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 32px 16px; color: var(--text-muted); }
 .state .icon { width: 32px; height: 32px; }

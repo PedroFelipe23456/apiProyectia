@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap">
   <!-- ?v=… obliga al navegador a bajar la versión nueva tras cada despliegue -->
-  <link rel="stylesheet" href="/static/css/styles.css?v=3.3.0">
+  <link rel="stylesheet" href="/static/css/styles.css?v=3.4.0">
   <script>
     // Aplica el tema guardado antes de pintar (evita un destello de color)
     try {
@@ -19,7 +19,7 @@
     } catch (e) {}
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-  <script type="module" src="/static/js/app.js?v=3.3.0"></script>
+  <script type="module" src="/static/js/app.js?v=3.4.0"></script>
 </head>
 <body>
   <!-- Iconos (Lucide, trazo 2 px) -->
@@ -165,6 +165,8 @@
                 <canvas id="g-gauge" role="img" aria-label="Medidor de potencia actual"></canvas>
                 <div class="gauge-center"><span class="kpi-value" id="gauge-valor">--</span><span class="kpi-unit">W</span></div>
               </div>
+              <div class="gauge-scale" aria-hidden="true"><span class="num">0 W</span><span class="num" id="gauge-max">-- W</span></div>
+              <p class="gauge-nivel" id="gauge-nivel" aria-live="polite">Nivel: --</p>
             </article>
             <article class="card chart-wide">
               <div class="card-head"><h2>Voltaje y corriente</h2><span class="help">Línea continua: V · discontinua: A</span></div>
@@ -175,7 +177,7 @@
               <div class="chart-box"><canvas id="g-potencia" role="img" aria-label="Potencia por registro"></canvas></div>
             </article>
             <article class="card">
-              <div class="card-head"><h2>Voltaje mín · prom · máx</h2><span class="help">V</span></div>
+              <div class="card-head"><h2>Voltaje mín · prom · máx</h2><span class="help num" id="nota-voltaje">V</span></div>
               <div class="chart-box"><canvas id="g-voltaje" role="img" aria-label="Voltaje mínimo, promedio y máximo"></canvas></div>
             </article>
             <article class="card">
