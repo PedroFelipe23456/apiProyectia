@@ -278,8 +278,10 @@ function crearGraficos() {
   const c = colores();
   Chart.defaults.font.family = token("--font-sans") || "sans-serif";
   Chart.defaults.font.size = 12;
-  const reducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  Chart.defaults.animation = reducido ? false : { duration: 250 };
+  // Sin animaciones: los datos llegan cada segundo y cada actualización se dibuja al instante.
+  // Con animación, Chart.js pinta en cuadros (requestAnimationFrame); al reiniciarla cada
+  // segundo, en algunos navegadores nunca terminaba y las gráficas quedaban en blanco.
+  Chart.defaults.animation = false;
 
   graficos.gauge = new Chart($("g-gauge"), {
     type: "doughnut",
@@ -294,8 +296,6 @@ function crearGraficos() {
     },
     options: {
       maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: "74%",
-      // El arco siempre se anima (300 ms) para que se vea subir y bajar en vivo
-      animation: reducido ? false : { duration: 300, easing: "easeOutCubic" },
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
     },
   });
@@ -349,9 +349,16 @@ function crearGraficos() {
   });
 }
 
+/** Redibuja de inmediato (sin animación); si algo falla, no frena las demás gráficas. */
+function redibujar(g) {
+  try {
+    g.update("none");
+  } catch (e) {
+    console.error("No se pudo dibujar la gráfica", g.canvas.id, e);
+  }
+}
+
 function actualizarGraficos() {
-  // En vivo se redibuja cada segundo: sin animación para que no "salte"
-  const como = modo === "vivo" ? "none" : undefined;
   const etiquetas = puntos.map((p) => p.etiqueta);
   const vs = puntos.map((p) => p.voltaje_v);
   const is = puntos.map((p) => p.corriente_a);
@@ -360,24 +367,24 @@ function actualizarGraficos() {
   graficos.vi.data.labels = etiquetas;
   graficos.vi.data.datasets[0].data = vs;
   graficos.vi.data.datasets[1].data = is;
-  graficos.vi.update(como);
+  redibujar(graficos.vi);
 
   graficos.potencia.data.labels = etiquetas;
   graficos.potencia.data.datasets[0].data = ps;
-  graficos.potencia.update(como);
+  redibujar(graficos.potencia);
 
   const prom = vs.reduce((a, b) => a + b, 0) / vs.length;
   const vMin = Math.min(...vs);
   const vMax = Math.max(...vs);
   graficos.voltaje.data.datasets[0].data = [vMin, Number(prom.toFixed(2)), vMax];
-  graficos.voltaje.update(como);
+  redibujar(graficos.voltaje);
   $("nota-voltaje").textContent = `${fmt(vMin, 2)} · ${fmt(prom, 2)} · ${fmt(vMax, 2)} V`;
 
   // La cantidad va en la leyenda para que se lea sin pasar el mouse por encima
   const cuentas = clasificarCorriente(is);
   graficos.corriente.data.labels = RANGOS_CORRIENTE.map((r, k) => `${r.nombre} (${r.texto}): ${cuentas[k]}`);
   graficos.corriente.data.datasets[0].data = cuentas;
-  graficos.corriente.update(como);
+  redibujar(graficos.corriente);
 
   actualizarGauge(ps[ps.length - 1], Math.max(...ps));
 }
@@ -387,7 +394,7 @@ function actualizarGauge(actual, maxVentana) {
   const escala = ESCALAS_W.find((e) => e >= maxVentana * 1.1) || ESCALAS_W[ESCALAS_W.length - 1];
   const valor = Math.min(Math.max(0, actual), escala);
   graficos.gauge.data.datasets[0].data = [valor, escala - valor];
-  graficos.gauge.update();
+  redibujar(graficos.gauge);
   $("gauge-valor").textContent = fmt(actual, 2);
   $("gauge-max").textContent = `${fmt(escala, 0)} W`;
 
@@ -419,6 +426,6 @@ export function aplicarTema() {
       if (eje.title) eje.title.color = c.texto;
     }
     if (g.options.plugins.legend && g.options.plugins.legend.labels) g.options.plugins.legend.labels.color = c.texto;
-    g.update();
+    redibujar(g);
   }
 }
