@@ -3,6 +3,7 @@ Módulo Motor: control de velocidad y dirección del motor DC (ESP32 + L298N).
 
 - GET /motor/         lo usa el ESP32 cada 1 s. Devuelve el estado deseado y registra
                       el contacto. Puede traer ?v=..&i=..&p=.. con los valores del LCD.
+                      Si hay una tecla pulsada en la web, la entrega en "tecla".
 - PUT /motor/         lo usa la web. Pydantic valida velocidad 0-100 y dirección.
 - GET /motor/estado   lo usa la web: estado, conexión del ESP32 y última lectura en vivo.
 
@@ -16,6 +17,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.modules.energia import vivo
+from app.modules.teclado.router import tomar_tecla
 
 router = APIRouter(prefix="/motor", tags=["Motor"])
 
@@ -29,6 +31,12 @@ class EstadoMotor(BaseModel):
 
     velocidad: int = Field(ge=0, le=100, description="Porcentaje 0-100")
     direccion: Literal["adelante", "atras", "stop"]
+
+
+class RespuestaESP32(EstadoMotor):
+    """Lo que recibe el ESP32: el estado del motor y, si hay, una tecla de la web."""
+
+    tecla: Optional[str] = None
 
 
 class LecturaEnVivo(BaseModel):
@@ -52,12 +60,12 @@ _ultimo_contacto: Optional[float] = None  # time.monotonic() del último GET del
 _lectura: Optional[LecturaEnVivo] = None
 
 
-@router.get("/", response_model=EstadoMotor)
+@router.get("/", response_model=RespuestaESP32)
 def leer_motor(
     v: Optional[float] = None,
     i: Optional[float] = None,
     p: Optional[float] = None,
-) -> EstadoMotor:
+) -> RespuestaESP32:
     """Lo usa el ESP32: v = voltaje (V), i = corriente (mA), p = potencia (W)."""
     global _ultimo_contacto, _lectura
     with _lock:
@@ -65,7 +73,8 @@ def leer_motor(
         if v is not None and i is not None and p is not None:
             _lectura = LecturaEnVivo(voltaje_v=v, corriente_ma=i, potencia_w=p)
             vivo.registrar(v, i, p)  # para las gráficas en tiempo real
-        return _estado
+        estado = _estado
+    return RespuestaESP32(**estado.model_dump(), tecla=tomar_tecla())
 
 
 @router.put("/", response_model=EstadoMotor)

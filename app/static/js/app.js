@@ -1,12 +1,14 @@
 // Shell de la aplicación: acceso, navegación por módulos (#energia, #motor,
-// #prediccion), tema claro/oscuro y consulta del estado del ESP32.
+// #teclado, #prediccion), tema claro/oscuro y consulta del estado del ESP32.
 import { pedir } from "./api.js";
 import * as energia from "./energia.js";
 import * as motor from "./motor.js";
+import * as teclado from "./teclado.js";
 import { initPrediccion } from "./prediccion.js";
 
 const $ = (id) => document.getElementById(id);
-const RUTAS = ["energia", "motor", "prediccion"];
+const RUTAS = ["energia", "motor", "teclado", "prediccion"];
+const TITULOS = { energia: "Energía", motor: "Motor", teclado: "Teclado", prediccion: "Predicción" };
 let rutaActual = null;
 let timerEstado = null;
 
@@ -29,6 +31,7 @@ function salir() {
   try { sessionStorage.removeItem("pm-sesion"); } catch (e) { /* nada */ }
   clearInterval(timerEstado);
   energia.detener();
+  teclado.detener();
   rutaActual = null;
   $("vista-app").hidden = true;
   $("vista-login").hidden = false;
@@ -55,13 +58,15 @@ function navegar() {
     if (a.dataset.ruta === ruta) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
-  document.title = { energia: "Energía", motor: "Motor", prediccion: "Predicción" }[ruta] + " · PowerMonitor IoT";
+  document.title = TITULOS[ruta] + " · PowerMonitor IoT";
   $("titulo-" + ruta).focus({ preventScroll: true });
   window.scrollTo(0, 0);
 
   // Las mediciones solo se consultan mientras el módulo Energía está abierto
   if (ruta === "energia") energia.iniciar();
   else energia.detener();
+  if (ruta === "teclado") teclado.iniciar();
+  else teclado.detener();
 }
 window.addEventListener("hashchange", navegar);
 
@@ -100,6 +105,7 @@ $("btn-tema").addEventListener("click", () => {
 // ---------------- Arranque ----------------
 motor.initMotor();
 energia.initEnergia();
+teclado.initTeclado();
 initPrediccion();
 pintarBotonTema();
 if (haySesion()) entrar();

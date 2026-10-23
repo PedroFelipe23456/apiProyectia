@@ -89,7 +89,16 @@ Cada opción responde `{"resultado": "..."}` con un texto de máximo 16 caracter
 | 6 | `/mediciones/registros-24h` | `Total: 30 regs` |
 | 9 | `/mediciones/desviacion` | `SD: 0.19 W` |
 
-Las opciones 1, 7, 8, 0 y A se resuelven en el ESP32 sin consultar la API.
+Las opciones 1, 7, 8, 0, A y B (recalibrar el cero del ACS712) se resuelven en el ESP32 sin consultar la API.
+
+### Teclado en la web
+| Método | Ruta | Quién | Qué hace |
+|---|---|---|---|
+| POST | `/teclado/` `{"tecla": "3"}` | Web (celular) | Pone la tecla en cola y responde las 2 líneas que mostrará el LCD |
+| GET | `/teclado/estado` | Web | Teclas pendientes y la última que ejecutó el ESP32 |
+
+El ESP32 recibe la tecla pendiente en el campo `"tecla"` de `GET /motor/` (su consulta de cada segundo)
+y la ejecuta como si se hubiera pulsado en el teclado físico. Una tecla que no se recoge en 1 minuto se descarta.
 
 ### Motor
 | Método | Ruta | Quién | Qué hace |

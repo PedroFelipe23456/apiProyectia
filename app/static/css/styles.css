@@ -160,7 +160,7 @@ main { padding: 16px 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)
 /* Navegación: barra inferior en móvil, barra lateral en escritorio */
 .nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   background: var(--surface); border-top: 1px solid var(--border);
@@ -261,6 +261,40 @@ tbody tr:last-child td { border-bottom: 0; }
 .status-row { display: flex; align-items: center; gap: 12px; }
 .status-row + .status-row { margin-top: 12px; }
 .tips { margin: 0; padding-left: 18px; color: var(--text-muted); font-size: .9rem; display: grid; gap: 6px; }
+
+/* ---------------- Teclado ---------------- */
+.teclado-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-width: 980px; }
+.lcd {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px 16px; border-radius: var(--radius-sm);
+  background: #9ccc3b; color: #1b2a06; border: 4px solid #2f3b12;
+  font-family: var(--font-mono); font-size: clamp(1rem, 4.6vw, 1.35rem); letter-spacing: .04em;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .12);
+}
+.lcd-linea { display: block; min-height: 1.4em; white-space: pre; overflow: hidden; }
+.envio { display: flex; align-items: center; gap: 8px; margin: 10px 0 16px; font-size: .875rem; color: var(--text-muted); }
+.envio .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.envio.pendiente { color: var(--warn); }
+.envio.pendiente .dot { background: var(--warn); }
+.envio.ok { color: var(--ok); }
+.envio.ok .dot { background: var(--ok); }
+.envio.error { color: var(--danger); }
+.envio.error .dot { background: var(--danger); }
+.keypad { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.tecla-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 72px; padding: 6px 4px;
+  font: inherit; color: var(--text); cursor: pointer; touch-action: manipulation;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  transition: background-color .15s ease-out, transform .1s ease-out;
+}
+.tecla-btn:hover { border-color: var(--text-muted); }
+.tecla-btn:active, .tecla-btn.pulsada { transform: scale(.95); background: color-mix(in srgb, var(--primary) 22%, var(--surface-2)); }
+.tecla-btn .tecla-num { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+.tecla-btn .tecla-txt { font-size: .6875rem; color: var(--text-muted); line-height: 1.2; text-align: center; }
+.tecla-btn.letra .tecla-num { color: var(--primary); }
+.tecla-btn.libre { opacity: .55; }
+@media (min-width: 768px) { .teclado-grid { grid-template-columns: 3fr 2fr; align-items: start; } }
 
 /* ---------------- Predicción ---------------- */
 .predict-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-width: 880px; }
