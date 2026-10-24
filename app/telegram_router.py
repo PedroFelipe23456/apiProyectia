@@ -2,6 +2,7 @@ import json
 import os
 import requests
 from fastapi import APIRouter, Request, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -142,4 +143,16 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
 @router.get("/estado-led")
 def consultar_estado_led():
     global ESTADO_LED
+    return {"led_encendido": ESTADO_LED}
+
+
+class OrdenLed(BaseModel):
+    encendido: bool
+
+
+@router.post("/estado-led")
+def fijar_estado_led(orden: OrdenLed):
+    """Lo llama bot_telegram.py. El ESP32 lee el valor con GET /telegram/estado-led cada 2 s."""
+    global ESTADO_LED
+    ESTADO_LED = orden.encendido
     return {"led_encendido": ESTADO_LED}
