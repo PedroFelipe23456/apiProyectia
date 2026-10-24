@@ -24,7 +24,7 @@ except ImportError:
 
 TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TG = f"https://api.telegram.org/bot{TOKEN}"
-API = os.getenv("API_BASE", "https://apiproyectia.onrender.com").rstrip("/")
+API = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")
 OLLAMA = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 MODELO = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b-instruct")
 
@@ -79,6 +79,11 @@ def intencion_reglas(texto):
 
 
 def detectar(texto):
+    # Órdenes críticas (LED y parar motor): las decide el código fijo, no el LLM,
+    # porque un modelo pequeño confunde "apaga" con "enciende".
+    r = intencion_reglas(texto)
+    if r[0] in ("encender_led", "apagar_led", "motor_stop"):
+        return r + ("reglas",)
     try:
         return intencion_llm(texto) + ("LLM",)
     except Exception as e:
@@ -95,12 +100,13 @@ def get(ruta, **p):
 
 def ejecutar(intent, vel):
     global estado_led
-    if intent == "encender_led":
-        estado_led = True
-        return "💡 Listo, LED encendido."
-    if intent == "apagar_led":
-        estado_led = False
-        return "🌑 Listo, LED apagado."
+    if intent in ("encender_led", "apagar_led"):
+        encender = intent == "encender_led"
+        r = requests.post(API + "/telegram/estado-led", json={"encendido": encender}, timeout=60)
+        r.raise_for_status()
+        estado_led = encender
+        return ("💡 Listo, LED encendido. El ESP32 lo aplica en ~2 s." if encender
+                else "🌑 Listo, LED apagado. El ESP32 lo aplica en ~2 s.")
     if intent in ("leer_sensor", "ultimo_registro"):
         datos = get("/mediciones/", limit=1)
         if not datos:
@@ -142,7 +148,7 @@ def main():
     if not TOKEN:
         raise SystemExit("Falta TELEGRAM_TOKEN en el .env")
     requests.get(f"{TG}/deleteWebhook", timeout=30)   # polling y webhook no pueden convivir
-    print("Bot listo. Escríbele en Telegram. Ctrl+C para salir.")
+    print("Bot v2 (LED vía API) listo. API:", API, "| Escríbele en Telegram. Ctrl+C para salir.")
     offset = None
     while True:
         try:
