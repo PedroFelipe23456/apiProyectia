@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap">
   <!-- ?v=… obliga al navegador a bajar la versión nueva tras cada despliegue -->
-  <link rel="stylesheet" href="/static/css/styles.css?v=3.5.1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=3.5.2">
   <script>
     // Aplica el tema guardado antes de pintar (evita un destello de color)
     try {
@@ -26,7 +26,7 @@
     } catch (e) {}
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-  <script type="module" src="/static/js/app.js?v=3.5.1"></script>
+  <script type="module" src="/static/js/app.js?v=3.5.2"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () {}); });
@@ -297,7 +297,7 @@
           <div class="view-head">
             <div>
               <h1 id="titulo-prediccion" tabindex="-1">Predicción de consumo</h1>
-              <p>Estima la categoría de consumo a partir del voltaje y la corriente.</p>
+              <p>Clasifica el estado de la carga con el modelo de IA entrenado en Edge Impulse. La potencia se calcula como voltaje × corriente.</p>
             </div>
           </div>
           <div class="predict-grid">
@@ -305,28 +305,29 @@
               <form id="form-prediccion" class="predict-form" novalidate>
                 <div class="field">
                   <label for="pred-v">Voltaje (V)</label>
-                  <input id="pred-v" type="number" inputmode="decimal" min="0" step="0.1" value="120" required>
+                  <input id="pred-v" type="number" inputmode="decimal" min="0" step="0.1" value="12" required>
                 </div>
                 <div class="field">
                   <label for="pred-i">Corriente (A)</label>
-                  <input id="pred-i" type="number" inputmode="decimal" min="0" step="0.01" value="1.5" required>
+                  <input id="pred-i" type="number" inputmode="decimal" min="0" step="0.01" value="0.5" required>
                   <span id="pred-error" class="error-text" role="alert" hidden>Escribe valores numéricos mayores o iguales a 0.</span>
                 </div>
-                <button class="btn btn-primary" type="submit">Calcular categoría</button>
+                <button class="btn btn-primary" type="submit">Predecir con el modelo</button>
                 <div id="pred-resultado" class="result" aria-live="polite">
                   <svg class="icon"><use href="#i-bulb"/></svg>
-                  <div><span class="help">Resultado</span><strong id="pred-categoria">Completa los datos</strong><span id="pred-detalle" class="help"></span></div>
+                  <div><span class="help">Resultado del modelo</span><strong id="pred-categoria">Completa los datos</strong><span id="pred-detalle" class="help"></span></div>
                 </div>
               </form>
             </article>
             <article class="card">
-              <div class="card-head"><h2>Cómo se clasifica</h2></div>
+              <div class="card-head"><h2>Categorías del modelo</h2></div>
               <ul class="levels">
-                <li><span>Carga baja / standby</span><span class="num">P ≤ 80 W</span></li>
-                <li><span>Consumo moderado</span><span class="num">80–300 W</span></li>
-                <li><span>Consumo alto</span><span class="num">300–600 W</span></li>
-                <li><span>Sobrecarga / crítico</span><span class="num">&gt; 600 W o &gt; 5 A</span></li>
+                <li><span>Reposo</span></li>
+                <li><span>Normal</span></li>
+                <li><span>Alta</span></li>
+                <li><span>Sobrecarga</span></li>
               </ul>
+              <p class="help" style="margin-top:12px">El modelo se entrenó con lecturas del ESP32 de aproximadamente 0 a 16,5 V. Con valores muy fuera de ese rango, la predicción no es confiable.</p>
             </article>
           </div>
         </section>

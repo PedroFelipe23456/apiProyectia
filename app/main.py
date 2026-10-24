@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from app.modules.catalogos.router import crear_routers as routers_catalogos
 from app.modules.energia.router import router as energia_router
 from app.modules.motor.router import router as motor_router
+from app.modules.prediccion.router import router as prediccion_router
 from app.modules.teclado.router import router as teclado_router
 from app.modules.vision.router import router as vision_router
 from app.modules.whatsapp.router import router as whatsapp_router
@@ -45,6 +46,7 @@ app.add_middleware(
 
 app.include_router(energia_router)
 app.include_router(motor_router)
+app.include_router(prediccion_router)
 app.include_router(teclado_router)
 for r in routers_catalogos():
     app.include_router(r)

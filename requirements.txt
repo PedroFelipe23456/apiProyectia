@@ -9,3 +9,6 @@ requests
 pillow
 ultralytics
 python-dotenv
+
+ai-edge-litert
+numpy

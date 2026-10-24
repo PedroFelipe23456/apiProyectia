@@ -1,19 +1,19 @@
-// Módulo Predicción: clasifica el consumo con las reglas del taller.
-import { fmt } from "./api.js";
-
+// Módulo Predicción: clasifica el estado de la carga con el modelo de Edge Impulse (POST /predecir).
 const $ = (id) => document.getElementById(id);
 
-const NIVELES = [
-  { clase: "nivel-critico", texto: "Sobrecarga / crítico", icono: "i-alert", cumple: (p, i) => p > 600 || i > 5 },
-  { clase: "nivel-alto", texto: "Consumo alto", icono: "i-alert", cumple: (p) => p > 300 },
-  { clase: "nivel-normal", texto: "Consumo moderado", icono: "i-check", cumple: (p) => p > 80 },
-  { clase: "nivel-bajo", texto: "Carga baja / standby", icono: "i-check", cumple: () => true },
-];
+const CATEGORIAS = {
+  reposo:     { clase: "nivel-bajo",    texto: "Reposo",     icono: "i-check" },
+  normal:     { clase: "nivel-normal",  texto: "Normal",     icono: "i-check" },
+  alta:       { clase: "nivel-alto",    texto: "Alta",       icono: "i-alert" },
+  sobrecarga: { clase: "nivel-critico", texto: "Sobrecarga", icono: "i-alert" },
+};
 
 export function initPrediccion() {
   const form = $("form-prediccion");
   const error = $("pred-error");
-  form.addEventListener("submit", (ev) => {
+  const boton = form.querySelector("button[type=submit]");
+
+  form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const v = parseFloat($("pred-v").value);
     const i = parseFloat($("pred-i").value);
@@ -23,13 +23,37 @@ export function initPrediccion() {
       return;
     }
     error.hidden = true;
-    const p = v * i;
-    const nivel = NIVELES.find((n) => n.cumple(p, i));
+
+    const p = Math.round(v * i * 100) / 100;
     const caja = $("pred-resultado");
-    caja.className = "result " + nivel.clase;
-    caja.querySelector("use").setAttribute("href", "#" + nivel.icono);
-    $("pred-categoria").textContent = nivel.texto;
-    $("pred-detalle").textContent = `Potencia estimada: ${fmt(p, 1)} W`;
+    $("pred-categoria").textContent = "Consultando al modelo…";
+    $("pred-detalle").textContent = "";
+    boton.disabled = true;
+
+    try {
+      const res = await fetch("/predecir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voltaje: v, corriente: i, potencia: p }),
+      });
+      const datos = await res.json();
+      if (!res.ok) throw new Error(datos.detail || "Error " + res.status);
+
+      const cat = CATEGORIAS[datos.categoria] || CATEGORIAS.normal;
+      caja.className = "result " + cat.clase;
+      caja.querySelector("use").setAttribute("href", "#" + cat.icono);
+      $("pred-categoria").textContent = cat.texto;
+      $("pred-detalle").textContent =
+        `Confianza: ${datos.confianza} % · Potencia calculada: ${p} W`;
+    } catch (err) {
+      $("pred-categoria").textContent = "No se pudo predecir";
+      $("pred-detalle").textContent = String(err.message || err);
+    } finally {
+      boton.disabled = false;
+    }
   });
-  ["pred-v", "pred-i"].forEach((id) => $(id).addEventListener("input", () => { error.hidden = true; }));
+
+  ["pred-v", "pred-i"].forEach((id) =>
+    $(id).addEventListener("input", () => { error.hidden = true; })
+  );
 }
